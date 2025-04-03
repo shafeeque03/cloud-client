@@ -1,20 +1,21 @@
 import React, { useEffect } from 'react';
 import { Navigate, Outlet, useLocation } from 'react-router-dom';
 import { useSelector, useDispatch } from 'react-redux';
-import { selectIsAuthenticated, selectAuthLoading, fetchCurrentUser } from '../redux/authSlice';
+import { selectIsAuthenticated, selectAuthLoading, selectCurrentUser, fetchCurrentUser } from '../redux/authSlice';
 
 const ProtectedRoute = () => {
   const isAuthenticated = useSelector(selectIsAuthenticated);
   const isLoading = useSelector(selectAuthLoading);
+  const currentUser = useSelector(selectCurrentUser);
   const dispatch = useDispatch();
   const location = useLocation();
   
   useEffect(() => {
-    // If we have a token but no user data, fetch the user
-    if (isAuthenticated && !isLoading) {
+    // Only fetch user data if authenticated and we don't already have user data
+    if (isAuthenticated && !isLoading && !currentUser) {
       dispatch(fetchCurrentUser());
     }
-  }, [dispatch, isAuthenticated, isLoading]);
+  }, [dispatch, isAuthenticated, isLoading, currentUser]);
   
   if (isLoading) {
     // Show loading spinner while checking authentication

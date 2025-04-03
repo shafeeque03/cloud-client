@@ -74,6 +74,8 @@ const authSlice = createSlice({
       state.token = null;
       state.user = null;
       state.isAuthenticated = false;
+      state.isLoading = false;
+      state.error = null;
     }
   },
   extraReducers: (builder) => {
@@ -97,8 +99,7 @@ const authSlice = createSlice({
       // Refresh token cases
       .addCase(refreshToken.fulfilled, (state, action) => {
         state.token = action.payload.accessToken;
-        state.user = action.payload.user;
-        state.isAuthenticated = true;
+        state.isAuthenticated = true; // Maintain authentication state
       })
       .addCase(refreshToken.rejected, (state) => {
         state.token = null;
@@ -111,6 +112,8 @@ const authSlice = createSlice({
         state.token = null;
         state.user = null;
         state.isAuthenticated = false;
+        state.isLoading = false;
+        state.error = null;
       })
       
       // Fetch user cases
@@ -124,6 +127,9 @@ const authSlice = createSlice({
       })
       .addCase(fetchCurrentUser.rejected, (state) => {
         state.isLoading = false;
+        state.token = null;
+        state.user = null;
+        state.isAuthenticated = false;
       });
   }
 });

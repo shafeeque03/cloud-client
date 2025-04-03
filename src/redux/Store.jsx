@@ -1,18 +1,15 @@
 import { configureStore, combineReducers } from '@reduxjs/toolkit';
-import { persistReducer, persistStore, FLUSH, REHYDRATE, PAUSE, PERSIST, PURGE, REGISTER } from 'redux-persist';
+import { persistReducer, persistStore } from 'redux-persist';
 import storage from 'redux-persist/lib/storage';
-import authReducer from './authSlice'
+import authReducer from './authSlice';
 import userReducer from './userSlice';
-import {thunk} from 'redux-thunk';
-
-// Import reducers
 
 // Persist config
 const authPersistConfig = {
   key: 'auth',
   storage,
   version: 1,
-  whitelist: ['token', 'user', 'isAuthenticated'] // Only persist these fields
+  whitelist: ['token', 'user', 'isAuthenticated']
 };
 
 // Root reducer
@@ -22,24 +19,19 @@ const rootReducer = combineReducers({
 });
 
 // Create store
-export const store = configureStore({
+const store = configureStore({
   reducer: rootReducer,
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware({
       serializableCheck: {
-        // Ignore these action types
-        ignoredActions: [FLUSH, REHYDRATE, PAUSE, PERSIST, PURGE, REGISTER],
-        // Ignore these field paths in all actions
-        ignoredActionPaths: ['meta.arg', 'payload.timestamp'],
-        // Ignore these paths in the state
-        ignoredPaths: ['items.dates']
+        ignoredActions: ['persist/PERSIST']
       }
-    }).concat(thunk),
+    }),
   devTools: process.env.NODE_ENV !== 'production'
 });
 
 // Create persistor
-export const persistor = persistStore(store);
+const persistor = persistStore(store);
 
-// Export store and persistor and typed hooks
-export default { store, persistor };
+// ✅ Export only once
+export { store, persistor };

@@ -25,6 +25,7 @@ const Folder = () => {
   const [newFolderName, setNewFolderName] = useState("");
   const [folderToRename, setFolderToRename] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [parentFolder, setParentFolder] = useState(null)
   const mainContentRef = useRef(null);
 
   useEffect(() => {
@@ -42,8 +43,10 @@ const Folder = () => {
     if (mainContentRef.current && mainContentRef.current.contains(event.target)) {
       const isClickOnFolder = event.target.closest(".folder-card");
       const isClickOnFile = event.target.closest(".file-card");
+      const isClickOnModal = event.target.closest(".modal-content");
+      const isClickOnItemActions = event.target.closest(".item-actions");
       
-      if (!isClickOnFolder && !isClickOnFile && !event.target.closest(".modal-content")) {
+      if (!isClickOnFolder && !isClickOnFile && !isClickOnModal && !isClickOnItemActions) {
         setSelectedItem(null);
       }
     }
@@ -53,7 +56,8 @@ const Folder = () => {
     try {
       setLoading(true);
       const response = await fetchChildFolders(folderId);
-      setFolders(response.data);
+      setFolders(response.data?.folders);
+      setParentFolder(response?.data?.parentFolder)
     } catch (error) {
       toast.error("Failed to load folders");
       console.error("Error loading folders:", error);
@@ -105,10 +109,18 @@ const Folder = () => {
     }
   };
 
-  const openRenameModal = (folder) => {
-    setFolderToRename(folder);
-    setNewFolderName(folder.name);
-    setShowRenameFolderModal(true);
+  const openRenameModal = (item) => {
+    // Debug statement to verify function is called and item is received
+    console.log("openRenameModal called with:", item);
+    
+    // Set state values for rename modal
+    setFolderToRename(item);
+    setNewFolderName(item.name);
+    
+    // Force state update in the next tick to ensure modal opens
+    setTimeout(() => {
+      setShowRenameFolderModal(true);
+    }, 0);
   };
 
   const handleItemClick = (item) => {
@@ -135,7 +147,7 @@ const Folder = () => {
             >
               <ArrowLeft size={20} className="text-gray-700" />
             </button>
-            <h1 className="text-2xl font-bold text-gray-800">Folder Contents</h1>
+            <h1 className="text-2xl font-bold text-gray-800">{parentFolder?.name}</h1>
           </div>
           <div className="flex space-x-3">
             <button
@@ -188,9 +200,9 @@ const Folder = () => {
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
               {files.map((file) => (
                 <FileCard
-                  key={file?._id}
+                  key={file._id || file.id} // Fallback to file.id if _id is not present
                   file={file}
-                  isSelected={selectedItem?._id === file?._id}
+                  isSelected={selectedItem?._id === file._id || selectedItem?.id === file.id}
                   onClick={() => handleItemClick(file)}
                 />
               ))}
@@ -198,12 +210,16 @@ const Folder = () => {
           )}
         </div>
 
+        {/* Item Actions Bar */}
         {selectedItem && (
-  <ItemActions 
-    item={selectedItem} 
-    onRename={folders.some(folder => folder._id === selectedItem._id) ? () => openRenameModal(selectedItem) : null}
-  />
-)}
+          <ItemActions 
+            item={selectedItem} 
+            onRenameClick={(e) => {
+              e.stopPropagation(); // Prevent event bubbling
+              openRenameModal(selectedItem);
+            }}
+          />
+        )}
       </div>
 
       {/* Add Folder Modal */}
@@ -219,7 +235,7 @@ const Folder = () => {
         />
       )}
 
-      {/* Rename Folder Modal */}
+      {/* Rename Folder Modal - Now using a separate variable to track visibility */}
       {showRenameFolderModal && (
         <AddFolderModal
           newFolderName={newFolderName}
@@ -298,22 +314,20 @@ const FileCard = ({ file, isSelected, onClick }) => {
 };
 
 // Item Actions Component (appears when an item is selected)
-const ItemActions = ({ item, onRename }) => {
+const ItemActions = ({ item, onRenameClick }) => {
   return (
-    <div className="fixed bottom-0 left-0 right-0 bg-white shadow-md p-4 border-t border-gray-200">
+    <div className="fixed bottom-0 left-0 right-0 bg-white shadow-md p-4 border-t border-gray-200 item-actions z-40">
       <div className="container mx-auto">
         <div className="flex justify-between items-center">
           <div className="font-medium text-gray-900">Selected: {item.name}</div>
           <div className="flex space-x-4">
-            {onRename && (
-              <button 
-                onClick={onRename} 
-                className="p-2 text-blue-600 hover:text-blue-800 flex items-center"
-              >
-                <Edit size={18} className="mr-1" />
-                <span>Rename</span>
-              </button>
-            )}
+            <button 
+              onClick={onRenameClick} 
+              className="p-2 text-blue-600 hover:text-blue-800 flex items-center"
+            >
+              <Edit size={18} className="mr-1" />
+              <span>Rename</span>
+            </button>
             <button className="p-2 text-gray-600 hover:text-gray-800 flex items-center">
               <Download size={18} className="mr-1" />
               <span>Download</span>
@@ -339,9 +353,30 @@ const AddFolderModal = ({
   title,
   confirmText
 }) => {
+  // Use a ref to focus the input when the modal opens
+  const inputRef = useRef(null);
+  
+  useEffect(() => {
+    // Focus the input field when modal opens
+    if (inputRef.current) {
+      inputRef.current.focus();
+    }
+  }, []);
+
+  // Prevent clicks inside the modal from closing it
+  const handleModalClick = (e) => {
+    e.stopPropagation();
+  };
+
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg p-6 w-full max-w-md modal-content">
+    <div 
+      className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
+      onClick={closeModal}
+    >
+      <div 
+        className="bg-white rounded-lg p-6 w-full max-w-md modal-content"
+        onClick={handleModalClick}
+      >
         <h3 className="text-xl font-medium text-gray-900 mb-4">
           {title}
         </h3>
@@ -355,6 +390,7 @@ const AddFolderModal = ({
           <input
             type="text"
             id="folderName"
+            ref={inputRef}
             value={newFolderName}
             onChange={(e) => setNewFolderName(e.target.value)}
             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"

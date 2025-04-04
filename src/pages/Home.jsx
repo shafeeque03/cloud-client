@@ -4,10 +4,11 @@ import {
   Download,
   Trash,
   Plus,
+  Edit
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
-import { createFolder, fetchFolders } from "../api/api";
+import { createFolder, fetchFolders, renameFolder } from "../api/api";
 import Navbar from "../components/user/Navbar";
 
 
@@ -16,7 +17,9 @@ const Home = () => {
   const [selectedItem, setSelectedItem] = useState(null);
   const [folders, setFolders] = useState([]);
   const [showAddFolderModal, setShowAddFolderModal] = useState(false);
+  const [showRenameFolderModal, setShowRenameFolderModal] = useState(false);
   const [newFolderName, setNewFolderName] = useState("");
+  const [folderToRename, setFolderToRename] = useState(null);
   const [loading, setLoading] = useState(false);
   const mainContentRef = useRef(null);
 
@@ -37,8 +40,10 @@ const Home = () => {
     if (mainContentRef.current && mainContentRef.current.contains(event.target)) {
       const isClickOnFolder = event.target.closest(".folder-card");
       const isClickOnFile = event.target.closest(".file-card");
+      const isClickOnModal = event.target.closest(".modal-content");
+      const isClickOnItemActions = event.target.closest(".item-actions");
       
-      if (!isClickOnFolder && !isClickOnFile && !event.target.closest(".modal-content")) {
+      if (!isClickOnFolder && !isClickOnFile && !isClickOnModal && !isClickOnItemActions) {
         setSelectedItem(null);
       }
     }
@@ -76,6 +81,39 @@ const Home = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleRenameFolder = async () => {
+    if (!newFolderName.trim()) {
+      toast.error("Please enter a folder name");
+      return;
+    }
+
+    try {
+      setLoading(true);
+      await renameFolder(folderToRename._id, newFolderName);
+      toast.success("Folder renamed successfully");
+      setNewFolderName("");
+      setShowRenameFolderModal(false);
+      setFolderToRename(null);
+      loadFolders(); // Refresh the folders list
+    } catch (error) {
+      toast.error("Failed to rename folder");
+      console.error("Error renaming folder:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const openRenameModal = (item) => {
+    // Set state values for rename modal
+    setFolderToRename(item);
+    setNewFolderName(item.name);
+    
+    // Force state update in the next tick to ensure modal opens
+    setTimeout(() => {
+      setShowRenameFolderModal(true);
+    }, 0);
   };
 
   const handleItemClick = (item) => {
@@ -131,8 +169,15 @@ const Home = () => {
           )}
         </div>
 
-
-        {selectedItem && <ItemActions item={selectedItem} />}
+        {selectedItem && (
+          <ItemActions 
+            item={selectedItem} 
+            onRenameClick={(e) => {
+              e.stopPropagation(); // Prevent event bubbling
+              openRenameModal(selectedItem);
+            }} 
+          />
+        )}
       </div>
 
       {/* Add Folder Modal */}
@@ -143,25 +188,63 @@ const Home = () => {
           handleAddFolder={handleAddFolder}
           closeModal={() => setShowAddFolderModal(false)}
           loading={loading}
+          title="Create New Folder"
+          confirmText="Create"
+        />
+      )}
+
+      {/* Rename Folder Modal */}
+      {showRenameFolderModal && (
+        <AddFolderModal
+          newFolderName={newFolderName}
+          setNewFolderName={setNewFolderName}
+          handleAddFolder={handleRenameFolder}
+          closeModal={() => setShowRenameFolderModal(false)}
+          loading={loading}
+          title="Rename Folder"
+          confirmText="Rename"
         />
       )}
     </div>
   );
 };
 
-// Add Folder Modal Component
+// Add/Rename Folder Modal Component
 const AddFolderModal = ({
   newFolderName,
   setNewFolderName,
   handleAddFolder,
   closeModal,
   loading,
+  title = "Create New Folder",
+  confirmText = "Create"
 }) => {
+  // Use a ref to focus the input when the modal opens
+  const inputRef = useRef(null);
+  
+  useEffect(() => {
+    // Focus the input field when modal opens
+    if (inputRef.current) {
+      inputRef.current.focus();
+    }
+  }, []);
+
+  // Prevent clicks inside the modal from closing it
+  const handleModalClick = (e) => {
+    e.stopPropagation();
+  };
+
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg p-6 w-full max-w-md modal-content">
+    <div 
+      className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
+      onClick={closeModal}
+    >
+      <div 
+        className="bg-white rounded-lg p-6 w-full max-w-md modal-content"
+        onClick={handleModalClick}
+      >
         <h3 className="text-xl font-medium text-gray-900 mb-4">
-          Create New Folder
+          {title}
         </h3>
         <div className="mb-4">
           <label
@@ -173,6 +256,7 @@ const AddFolderModal = ({
           <input
             type="text"
             id="folderName"
+            ref={inputRef}
             value={newFolderName}
             onChange={(e) => setNewFolderName(e.target.value)}
             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
@@ -196,10 +280,10 @@ const AddFolderModal = ({
             {loading ? (
               <>
                 <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
-                Creating...
+                Processing...
               </>
             ) : (
-              <>Create</>
+              <>{confirmText}</>
             )}
           </button>
         </div>
@@ -235,16 +319,19 @@ const FolderCard = ({ folder, isSelected, onClick, onDoubleClick }) => {
 
 
 // Item Actions Component (appears when an item is selected)
-const ItemActions = ({ item }) => {
+const ItemActions = ({ item, onRenameClick }) => {
   return (
-    <div className="fixed bottom-0 left-0 right-0 bg-white shadow-md p-4 border-t border-gray-200">
+    <div className="fixed bottom-0 left-0 right-0 bg-white shadow-md p-4 border-t border-gray-200 item-actions z-40">
       <div className="container mx-auto">
         <div className="flex justify-between items-center">
           <div className="font-medium text-gray-900">Selected: {item.name}</div>
           <div className="flex space-x-4">
-            <button className="p-2 text-gray-600 hover:text-gray-800 flex items-center">
-              <Download size={18} className="mr-1" />
-              <span>Download</span>
+            <button 
+              onClick={onRenameClick} 
+              className="p-2 text-blue-600 hover:text-blue-800 flex items-center"
+            >
+              <Edit size={18} className="mr-1" />
+              <span>Rename</span>
             </button>
             <button className="p-2 text-red-600 hover:text-red-800 flex items-center">
               <Trash size={18} className="mr-1" />

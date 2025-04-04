@@ -33,13 +33,11 @@ axiosAuthInstance.interceptors.response.use(
   (response) => response,
   async (error) => {
     const originalRequest = error.config;
-
-    if (error.response?.status === 401 && !originalRequest._retry) {
+    if (error.response?.status === 403 && !originalRequest._retry) {
       originalRequest._retry = true;
       try {
         // Dispatch refresh token action
         const { payload } = await store.dispatch(refreshToken());
-
         if (payload?.accessToken) {
           axiosAuthInstance.defaults.headers.common["Authorization"] = `Bearer ${payload.accessToken}`;
           originalRequest.headers["Authorization"] = `Bearer ${payload.accessToken}`;

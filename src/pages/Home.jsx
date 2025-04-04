@@ -152,9 +152,9 @@ const Home = () => {
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
               {files.map((file) => (
                 <FileCard
-                  key={file._id}
+                  key={file?._id}
                   file={file}
-                  isSelected={selectedItem?._id === file._id}
+                  isSelected={selectedItem?._id === file?._id}
                   onClick={() => handleItemClick(file)}
                 />
               ))}

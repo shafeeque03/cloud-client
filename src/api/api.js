@@ -20,10 +20,18 @@ export const authApi = {
 };
 
 // Folder-related API calls (protected routes)
-export const createFolder = async (name) => {
-    return await axiosAuthInstance.post('/user/create-folder', { name }); 
+export const createFolder = async (name,folderId) => {
+    return await axiosAuthInstance.post('/user/create-folder', { name,folderId }); 
+}
+
+export const renameFolder = async (folderId, name) => {
+    return await axiosAuthInstance.patch('/user/rename-folder', { folderId, name }); 
 }
 
 export const fetchFolders = async () => {
     return await axiosAuthInstance.get('/user/fetch-home'); 
+}
+
+export const fetchChildFolders = async (folderId) => {
+    return await axiosAuthInstance.get(`/user/fetch-child-folders/${folderId}`); 
 }
